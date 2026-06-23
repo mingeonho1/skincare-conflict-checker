@@ -64,4 +64,11 @@
 
 ## Ship
 
+- 배포일: 2026-06-19
+- 프로덕션 URL: https://skincare-conflict-checker.vercel.app
+- 스모크: HTTP 200, 랜딩 핵심 카피("같이 발라도 되는지"·"충돌 검사") 렌더 확인
+- 자동배포: GitHub `main` push → Vercel 자동 프로덕션 배포 연결됨
+- env 상태: 시크릿 없이 배포(Supabase optional → 로깅 비활성, Gemini optional → 키워드 폴백). 키 추가 시 자동 활성화
+- 성공 지표(PLAN): 검사 완료율 — Supabase 로깅 활성화 후 수집 시작
+
 ## Retro
