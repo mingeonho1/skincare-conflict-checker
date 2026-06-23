@@ -13,10 +13,12 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
-  // 기본 Supabase 스택 (안 쓰는 빌드는 제거). 키 이름은 CI 더미 env와 1:1.
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-  SUPABASE_SECRET_KEY: z.string().min(1),
+  // Supabase는 익명 검사 로깅(계측) 전용이라 optional이다. 미설정이면 db가 null이고
+  // logCheck가 조용히 no-op한다 — 핵심 기능은 Supabase 없이 100% 동작한다(PLAN: 로깅은 선택).
+  // 키를 Vercel에 추가하면 로깅이 자동 활성화된다.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_PUBLISHABLE_KEY: z.string().min(1).optional(),
+  SUPABASE_SECRET_KEY: z.string().min(1).optional(),
 
   // 절대 URL. 비워두면 siteUrl()이 자동 분기하므로 optional.
   SITE_URL: z.string().url().optional(),

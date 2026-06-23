@@ -9,6 +9,7 @@ type CheckLogPayload = {
 };
 
 export async function logCheck(payload: CheckLogPayload): Promise<void> {
+  if (!db) return; // Supabase 미설정 — 로깅 비활성(핵심 기능엔 영향 없음)
   try {
     const { error } = await db.from("skinclash_check_log").insert({
       product_count: payload.productCount,
