@@ -1,0 +1,91 @@
+/* Pretendard Variable — 토스가 만든 한글 가변 폰트 */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", sans-serif;
+
+  /* ── 같이써도돼? 디자인 토큰 ──────────────────────────────────────────────
+     브랜드: 차분한 스틸 블루-그레이 (신뢰감 있는 · 깨끗한 · 다정한)
+     시맨틱 컬러(경고/안심/팁)는 정보 축 — 브랜드와 완전히 분리
+     상세 근거: DESIGN.md
+  ── */
+
+  /* 배경 & 서피스 */
+  --color-bg: #fafbfc;
+  --color-surface: #f2f5f8;
+  --color-surface-raised: #ffffff;
+  --color-border: #e2e8f0;
+
+  /* ink 스케일 — 블루-그레이 기조 */
+  --color-ink: #1a2332;
+  --color-ink-sub: #4a5568;
+  --color-ink-weak: #8e99a8;
+
+  /* 브랜드 컬러 — 뮤트된 스틸 블루 */
+  --color-primary: #4f7a9b;
+  --color-primary-strong: #3a6080;
+  --color-primary-subtle: #e8f1f8;
+
+  /* 시맨틱 — 경고(warn) */
+  --color-warn-bg: #fff5f5;
+  --color-warn-border: #feb2b2;
+  --color-warn-text: #c53030;
+  --color-warn-badge: #fed7d7;
+  --color-warn-high: #e53e3e;
+  --color-warn-moderate: #dd6b20;
+
+  /* 시맨틱 — 안심(safe) */
+  --color-safe-bg: #f0fff4;
+  --color-safe-border: #9ae6b4;
+  --color-safe-text: #276749;
+
+  /* 시맨틱 — 팁(tip) */
+  --color-tip-bg: #fffbeb;
+  --color-tip-border: #fbd38d;
+  --color-tip-text: #92400e;
+
+  /* 시맨틱 — 성공(success) */
+  --color-success: #38a169;
+
+  /* radius */
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-badge: 6px;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 마이크로 인터랙션 — 카드 등장 */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 200ms ease-out both;
+}
+
+/* 마이크로 인터랙션 — prefers-reduced-motion 존중 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

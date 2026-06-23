@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Quality gate (lint + typecheck + test)
+        run: pnpm check
+
+      # next build는 서버 모듈을 import-time에 평가하며 env를 읽는다(철칙 6). CI는
+      # "빌드가 되는가"만 검증하므로 형태만 맞는 더미 env를 준다. 키 이름은 해당
+      # 빌드의 src/lib/env.ts 스키마와 1:1로 맞춘다(아래는 기본 Supabase 스택 예시).
+      # 진짜 시크릿은 배포 플랫폼에서 주입되고, 그쪽 빌드는 실제 env로 검증된다.
+      - name: Build
+        run: pnpm build
+        env:
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+          SUPABASE_SECRET_KEY: ci-placeholder
+          # SITE_URL은 optional (env.ts의 siteUrl()이 자동 분기) — CI에 안 줘도 빌드된다.
+          # 키를 추가하는 빌드는 여기 더미도 1:1로 추가할 것.
+
+      - name: Dead code check (warning only)
+        run: pnpm knip || echo "::warning::knip이 죽은 코드를 발견했습니다. reviewer 검수 시 확인하세요."
