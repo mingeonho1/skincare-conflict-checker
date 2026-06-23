@@ -37,16 +37,25 @@
   --color-warn-badge: #fed7d7;
   --color-warn-high: #e53e3e;
   --color-warn-moderate: #dd6b20;
+  /* high severity 전용 — 더 진한 배경/테두리 */
+  --color-warn-high-bg: #fff0f0;
+  --color-warn-high-border: #fc8181;
+
+  /* 시맨틱 — 주의(caution, 앰버) */
+  --color-caution-bg: #fffbeb;
+  --color-caution-border: #fbd38d;
+  --color-caution-text: #92400e;
+  --color-caution-badge: #fef3c7;
 
   /* 시맨틱 — 안심(safe) */
   --color-safe-bg: #f0fff4;
   --color-safe-border: #9ae6b4;
   --color-safe-text: #276749;
 
-  /* 시맨틱 — 팁(tip) */
-  --color-tip-bg: #fffbeb;
-  --color-tip-border: #fbd38d;
-  --color-tip-text: #92400e;
+  /* 시맨틱 — 팁(tip/info, neutral blue-gray — caution amber와 구분) */
+  --color-tip-bg: #f0f4ff;
+  --color-tip-border: #c3d4e8;
+  --color-tip-text: #4a6080;
 
   /* 시맨틱 — 성공(success) */
   --color-success: #38a169;

@@ -18,10 +18,10 @@ function collectAmFixedIds(activeIds: string[]): Set<string> {
 
 function conflictsWithAmActive(
   activeId: string,
-  warnings: WarningItem[],
+  allConflicts: WarningItem[],
   amFixedIds: Set<string>,
 ): boolean {
-  return warnings.some(
+  return allConflicts.some(
     (w) =>
       w.activeIds.includes(activeId) &&
       w.activeIds.some((id) => id !== activeId && amFixedIds.has(id)),
@@ -30,21 +30,21 @@ function conflictsWithAmActive(
 
 function resolveTimeSlot(
   activeId: string,
-  warnings: WarningItem[],
+  allConflicts: WarningItem[],
   amFixedIds: Set<string>,
 ): "AM" | "PM" {
   const active = ACTIVE_MAP.get(activeId);
   if (!active) return "AM";
   if (active.photosensitive || active.timeOfDay === "PM") return "PM";
   if (active.timeOfDay === "AM") return "AM";
-  // timeOfDay === 'ANY': default AM, push to PM only when it conflicts with an AM active
-  // so it gets separated from the conflicting ingredient (e.g. BPO away from vitamin-c)
-  return conflictsWithAmActive(activeId, warnings, amFixedIds) ? "PM" : "AM";
+  return conflictsWithAmActive(activeId, allConflicts, amFixedIds)
+    ? "PM"
+    : "AM";
 }
 
 export function buildRoutine(
   activeIds: string[],
-  warnings: WarningItem[],
+  allConflicts: WarningItem[],
 ): RoutineResult {
   const amFixedIds = collectAmFixedIds(activeIds);
   const amSteps: Step[] = [];
@@ -61,14 +61,13 @@ export function buildRoutine(
       viscosityRank: active.viscosityRank,
     };
 
-    if (resolveTimeSlot(activeId, warnings, amFixedIds) === "PM") {
+    if (resolveTimeSlot(activeId, allConflicts, amFixedIds) === "PM") {
       pmSteps.push(step);
     } else {
       amSteps.push(step);
     }
   }
 
-  // Thinnest texture first (ascending viscosityRank)
   amSteps.sort((a, b) => a.viscosityRank - b.viscosityRank);
   pmSteps.sort((a, b) => a.viscosityRank - b.viscosityRank);
 

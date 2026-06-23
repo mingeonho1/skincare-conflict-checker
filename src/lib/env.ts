@@ -35,6 +35,7 @@ export const env = envSchema.parse(process.env);
  *  - Vercel 배포면 프로젝트별 자동 주입값(VERCEL_PROJECT_PRODUCTION_URL)
  *  - 그 외(로컬)면 localhost
  */
+// 공용 유틸: OG metadataBase 등 절대 URL이 필요한 소비처를 위한 인프라 함수 (knip ignoreMembers)
 export function siteUrl(): string {
   if (env.SITE_URL) return env.SITE_URL;
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;

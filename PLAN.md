@@ -12,14 +12,16 @@
 
 내 화장대에 있는 제품 2~6개의 전성분을 붙여넣은 사용자가 "충돌 검사하기"를 누르면 → ① 함께 쓰면 안 되는 성분 쌍을 메커니즘·심각도·대처법과 함께 경고받고, ② "이건 같이 써도 괜찮아요" 안심 카드로 통념을 바로잡고, ③ 안전한 아침/저녁 사용 순서 타임라인을 얻는다.
 
+> **핵심 기능은 여전히 1개(충돌검사+루틴)다.** v3에서 추가하는 사진 OCR·프리셋 칩은 전성분 textarea를 **채우는 입력 레이어**일 뿐, 판정에 절대 관여하지 않는다(아래 §v3 입력 자동화).
+
 ## 깊이 명세 (이 1개를 상용급으로 — 의무)
 
 ### 아키텍처 원칙 (이번 빌드의 가장 중요한 제약 — 위반 불가)
 
 - **충돌 '판정'은 규칙 기반(결정론적)이 유일한 진실의 원천이다.** 큐레이션된 액티브 성분 사전(약 10종)과 충돌 규칙 테이블을 코드(`schema.ts` + 정적 데이터)로 직접 구축한다. zod로 규칙·결과 스키마를 검증한다.
-- **Gemini(LLM)는 두 가지에만 쓴다**: (a) 입력된 전성분 텍스트에서 위 사전의 액티브 성분이 들어있는지 **추출/정규화**(한글·영문·INCI 별칭 매핑), (b) 이미 규칙 엔진이 내린 충돌 결과를 사용자 친화적 한국어 설명으로 **윤문**. 충돌 '여부 판정'은 절대 LLM에 맡기지 않는다(LLM은 안전정보 인용을 환각함).
-- **Gemini 미설정/실패/타임아웃 시에도 규칙 엔진은 항상 동작한다.** 추출은 사전 별칭 키워드 매칭으로 폴백, 설명은 룰테이블에 내장된 기본 한국어 카피로 폴백한다. 즉 핵심 기능은 LLM 없이도 100% 작동하고, LLM은 정확도·자연스러움을 더하는 부가 레이어다.
-- `GEMINI_API_KEY`는 `src/lib/env.ts`에서 zod로 옵셔널 검증한다. 미설정이면 폴백 경로로 분기(에러 아님).
+- **Gemini(LLM)는 두 가지에만 쓴다**: (a) 입력된 전성분 텍스트에서 위 사전의 액티브 성분이 들어있는지 **추출/정규화**(한글·영문·INCI 별칭 매핑), (b) 이미 규칙 엔진이 내린 충돌 결과를 사용자 친화적 한국어 설명으로 **윤문**. **v3에서 Gemini Vision은 (c) 제품 뒷면 사진에서 전성분 텍스트를 추출(OCR)하는 데만 추가로 쓴다.** 셋 다 충돌 '여부 판정'은 절대 LLM에 맡기지 않는다(LLM은 안전정보 인용을 환각함). Vision이 읽은 텍스트도 기존 extract→judge 파이프라인을 그대로 탄다.
+- **Gemini 미설정/실패/타임아웃 시에도 규칙 엔진은 항상 동작한다.** 추출은 사전 별칭 키워드 매칭으로 폴백, 설명은 룰테이블에 내장된 기본 한국어 카피로 폴백한다. 즉 핵심 기능(붙여넣기→검사)은 LLM 없이도 100% 작동하고, LLM은 정확도·자연스러움·입력편의를 더하는 부가 레이어다. **단 사진 OCR만은 키워드 폴백이 불가능하다(이미지엔 텍스트가 없음)** — 이때는 graceful degrade로 "직접 붙여넣어 주세요" 안내하고 붙여넣기 흐름으로 자연 회귀한다.
+- `GEMINI_API_KEY`는 `src/lib/env.ts`에서 zod로 옵셔널 검증한다. 미설정이면 폴백 경로로 분기(에러 아님). **사진 업로드 UI는 키가 없으면 숨기거나 비활성화한다(붙여넣기 흐름엔 영향 없음).**
 
 ### 큐레이션 액티브 성분 사전 (코드 데이터 — 이대로 구현)
 
@@ -72,7 +74,7 @@
 7. **충돌 0건 + 안심 조합도 0건** → 초록 톤 "검사한 조합에서 알려진 충돌이 없어요. 안심하고 사용하세요." (과잉 경고 금지 원칙의 핵심 메시지).
 8. **광민감 성분(레티놀/AHA/BHA) 있는데 자외선차단 미감지** → 결과 하단 보너스 노란 안내 카드: "레티놀/산 성분을 쓰는 동안엔 아침 자외선차단이 특히 중요해요." (경고 아님, 팁).
 9. **매우 긴 전성분 텍스트(제품당 4000자 초과)** → 클라이언트에서 4000자로 트림 + "일부가 잘렸어요" 표시, 서버는 입력 길이 상한(zod max)으로 거부 대신 트림 후 처리.
-10. **제품 6개 초과 추가 시도** → "한 번에 최대 6개까지 검사할 수 있어요" 토스트, 카드 추가 버튼 비활성.
+10. **제품 6개 초과 추가 시도** → "한 번에 최대 6개까지 검사할 수 있어요" 토스트, 카드 추가 버튼 비활성. (프리셋 칩으로 추가할 때도 동일 상한 준수.)
 11. **전성분에 액티브 외 자극 성분만 있는 흔한 오해 입력**(예: 향료/알코올) → 우리가 판정하지 않는 영역임을 침묵(과잉 경고 금지), 단 안심 카드 N개·경고 N개 카운트로 "검사 완료" 신뢰 신호.
 12. **네트워크 단절/서버 500** → 결과 영역에 "분석에 실패했어요. 다시 시도" 버튼(입력 유지), 입력값은 로컬 상태로 보존되어 재시도 시 재입력 불필요.
 
@@ -82,6 +84,7 @@
 2. **메커니즘 기반 AM/PM 사용 순서 타임라인**: 단순 충돌 경고를 넘어 "그래서 어떻게 발라야 하나"를 아침/저녁 순서 카드로 결정론적으로 제시(화해 등이 공개적으로 약한 지점).
 3. **한국 제품/한글 전성분 우선**: 별칭 사전이 한글 INCI 표기(아스코빅애씨드, 살리실릭애씨드 등)를 1순위로 포함 — 한국 화장품 뒷면을 그대로 붙여넣어도 잡힌다.
 4. **LLM 없이도 동작하는 견고함**: 폴백이 "기능 저하"가 아니라 "정상 결과 + 간소한 설명"이 되도록 룰테이블에 기본 카피를 내장. 신뢰 도구로서 가용성 100%.
+5. **(v3) 입력 마찰 제거 — 전성분을 외우지 않아도 된다**: 제품 뒷면 사진을 찍어 올리면 Gemini Vision이 전성분 텍스트를 채워주고, 제품 유형 프리셋 칩으로는 DB 없이 30초 만에 대표 전성분으로 시작한다. 둘 다 "읽었어요/대표값이에요"를 정직하게 고지하고 사용자가 눈으로 검증 후 같은 판정 파이프라인을 탄다.
 
 ### "상용 제품이라면 당연히 있어야 할 것" 체크
 
@@ -91,21 +94,27 @@
 - **피부타입·민감도 맞춤** — **Non-goal**.
 - **예시로 채우기**(빈 화면 탈출) — **포함** (입력 화면 "예시로 채우기" 버튼).
 - **재검사·입력 수정 후 재실행** — **포함** (결과에서 "수정하기"로 입력 복귀, 상태 보존).
+- **(v3) 사진으로 전성분 입력** — **포함** (제품 카드별 사진 업로드 → Vision OCR → 편집 가능 채움).
+- **(v3) 제품 유형 프리셋 칩** — **포함** (큐레이션 아키타입 ~8종, 정적 데이터, 즉시).
+- **제품명→전성분 자동완성(제품 DB 연동)** — **Non-goal** (한국 커버리지·환각 리스크, 다음 빌드).
 
 ## 디자인 아이덴티티
 
 - 레퍼런스 후보: **Toss**(해요체 마이크로카피·한 화면 한 메시지·넉넉한 여백·단일 CTA), **Stripe**(결과의 정보 정렬 — 경고 카드/순서 표의 정돈), 보조 **Family**(부드러운 radius·따뜻한 빈 상태). 형용사 3개: **신뢰감 있는 · 깨끗한 · 다정한**.
 - 시각 구별 이유: 의료/안전 정보 도구라 **경고=레드 / 안심=그린 / 팁=옐로우의 시맨틱 컬러가 정보의 핵심 축**이다. 따라서 브랜드 컬러는 이 셋과 충돌하지 않는 톤(차분한 블루/슬레이트 계열)으로 잡아 "다 비슷한 그린 SaaS"와 확실히 구별되게 한다. 빨강이 무섭지 않게(자극적 순색 금지), 초록이 안도가 되게 톤을 다듬는 것이 design 스킬의 과제.
+- **(v3) 입력 자동화 UI는 기존 정체성을 그대로 유지한다.** 프리셋 칩 row는 히어로 아래 한 줄로 부드럽게 녹이고(액티브 성분 칩과 시각적으로 구별 — 클릭 가능 affordance), 사진 업로드는 textarea 옆 작은 보조 버튼(camera/upload 아이콘)으로 절제한다. 사진/프리셋이 메인 CTA(붙여넣기→검사)를 가리지 않는 위계.
 
-> 상세 팔레트·토큰은 builder가 design 스킬(Phase 0~1)로 확정하고 DESIGN.md에 기록한다.
+> 상세 팔레트·토큰은 builder가 design 스킬(Phase 0~1)로 확정하고 DESIGN.md에 기록한다. (이미 확정됨 — v3는 그 토큰을 재사용.)
 
 ## 화면 (2개)
 
 1. **랜딩 + 입력 (한 페이지, `/`)** — 전달 메시지: "같이 발라도 되는지, 30초면 알아요."
    - 히어로: 헤드라인 + 한 줄 설명 + 우리가 검사하는 성분(레티놀·비타민C·산 등) 칩 나열.
+   - **(v3) 프리셋 칩 row**: 히어로 아래, 제품 유형 아키타입 칩 ~8종. 칩 클릭 → 그 대표 전성분이 채워진 제품 카드가 추가됨(제품명=아키타입). "대표 성분 기준이라 실제 제품과 다를 수 있어요" 안내 한 줄. 6개 상한 도달 시 칩 비활성.
    - 제품 입력 영역: 제품 카드 2개가 기본 노출, "+ 제품 추가"(최대 6개), 각 카드 = (선택)제품명 인풋 + 전성분 textarea + 인라인 검증 메시지.
+   - **(v3) 카드별 사진 업로드**: 각 카드에 "사진으로 추가"(파일 선택/드래그). 사진 올리면 카드별 로딩 → Vision OCR 결과를 textarea에 채우고 "사진에서 읽었어요 — 맞는지 확인해 주세요" 안내. 키 없으면 버튼 숨김/비활성. 실패/타임아웃 시 "사진 인식이 안 돼요. 전성분을 직접 붙여넣어 주세요."
    - "예시로 채우기" 버튼(레티놀 세럼 + 비타민C 세럼 등 시연용 프리셋), "충돌 검사하기" 단일 CTA.
-   - 상태: **빈**(예시 유도) / **입력 중**(per-card 검증) / **제출 중**(CTA 로딩 스피너).
+   - 상태: **빈**(예시/프리셋/사진 유도) / **입력 중**(per-card 검증) / **사진 인식 중**(per-card 로딩) / **제출 중**(CTA 로딩 스피너).
 2. **결과 (`/result` 또는 동일 페이지 하단 전환)** — 전달 메시지: 한눈에 위험/안심/순서.
    - 상단 요약 배너: "경고 N개 · 안심 M개 · 분석한 제품 K개" + (폴백 시) "기본 분석 모드" 배지.
    - ① **경고 카드(레드)**: 성분 쌍 + 심각도 뱃지 + 메커니즘 + 대처법. severity 높은 순 정렬.
@@ -117,93 +126,31 @@
 
 ## 데이터 모델
 
-충돌 규칙·성분 사전은 **코드 내 정적 데이터**(`src/features/checker/data.ts` 등), DB가 아니다. Supabase는 성공지표 계측용 최소 1테이블만:
+충돌 규칙·성분 사전·**프리셋 아키타입**은 **코드 내 정적 데이터**(`src/features/checker/data.ts`, `presets-data.ts` 등), DB가 아니다. Supabase는 성공지표 계측용 최소 1테이블만:
 
-- `skinclash_check_log`: `id`(uuid), `created_at`(timestamptz), `product_count`(int), `detected_active_ids`(text[]), `warn_count`(int), `safe_count`(int), `used_llm`(bool). — 전성분 원문·개인정보는 저장하지 않음(익명 집계용).
+- `skinclash_check_log`: `id`(uuid), `created_at`(timestamptz), `product_count`(int), `detected_active_ids`(text[]), `warn_count`(int), `safe_count`(int), `used_llm`(bool). — 전성분 원문·개인정보·**업로드 사진**은 저장하지 않음(익명 집계용).
 
 > 이 테이블 DDL은 `supabase-shared/schema.sql`에 합쳐 origin 기준으로 관리(shipping §0-1). 테이블 prefix는 `skinclash_`.
 
 ## Non-goals (이번 주에 절대 안 만드는 것)
 
-- 바코드 스캔 / 사진 OCR 입력 (한국 커버리지 부족).
-- 식약처/제품 DB 연동, 제품명으로 자동 전성분 채우기.
+- **제품명으로 전성분 자동완성 / 식약처·제품 DB 연동** (한국 커버리지 부족·환각 리스크, 다음 빌드).
+- 바코드 스캔.
 - 제품 추천 / 대체품 제안.
 - 피부타입·민감도 진단 및 맞춤.
 - 로그인 / 검사 결과 저장 / 마이페이지 / 공유 URL·이미지.
 - 성분 사전 검색·브라우징 페이지.
 - 충돌 여부의 LLM 판정(아키텍처 원칙상 영구 금지).
+- 업로드 사진 저장·재사용·갤러리(휘발, 추출 후 폐기).
 - 결제 / 프리미엄.
+
+> ~~사진 OCR 입력~~ → v3 입력 자동화로 이동(아래). Vision은 **추출 전용**, 판정엔 절대 관여하지 않는다.
 
 ## 작업 분해 (builder용 체크리스트)
 
-- [x] **env 확장 + 검증**
-  - 경로: `src/lib/env.ts`
-  - 완료 조건: `GEMINI_API_KEY`를 zod optional로 추가하고, 미설정 시 throw 없이 `undefined`로 노출된다. 기존 Supabase env 검증은 유지된다.
-  - 테스트: T1
+> v1~v2 코어는 모두 완료([x]). v3 입력 자동화는 §"v3 작업 분해" 참조. 단일 진실 명세는 `scratchpad/INPUT_SPEC.md`.
 
-- [x] **성분 사전 + 충돌 규칙 정적 데이터**
-  - 경로: `src/features/checker/data.ts`
-  - 완료 조건: 위 "사전 10종"과 "충돌 규칙 테이블"(warn 3 + safe 3)이 그대로 들어있고, 각 항목이 `schema.ts`의 타입을 만족한다. 별칭은 정규화 비교를 전제로 한 배열이다.
-  - 참조: 깊이 명세 §사전 / §규칙 테이블 / 테스트: T2
-
-- [x] **zod 스키마 + 파생 타입**
-  - 경로: `src/features/checker/schema.ts`
-  - 완료 조건: `ActiveIngredient`, `ConflictRule`, `CheckInput`(products: {name?, ingredients}[] 2~6개, 각 ingredients ≤4000자), `CheckResult`(warnings/safeNotes/amSteps/pmSteps/excludedProducts/duplicateActives/needsSunscreen/usedLlm/detectedActiveIds) 스키마와 타입이 정의된다. `CheckInput.parse`가 제품 1개·7개·빈 ingredients를 적절히 처리(1개는 통과, 7개는 거부).
-  - 테스트: T3, T4
-
-- [x] **액티브 성분 추출 — 키워드 폴백**
-  - 경로: `src/features/checker/extract.ts`
-  - 완료 조건: `extractByKeyword(ingredients: string): string[]`가 입력 텍스트를 정규화(공백/대소문자/하이픈 제거)해 사전 별칭과 부분일치로 감지된 `ActiveIngredient.id` 배열을 중복 없이 반환한다. 한글("살리실릭애씨드")·영문("salicylic acid")·혼용을 모두 잡는다.
-  - 참조: 깊이 명세 §엣지 6 / 테스트: T5~T8
-
-- [x] **충돌 판정 코어 (결정론적)**
-  - 경로: `src/features/checker/engine.ts`
-  - 완료 조건: `judge(productActives: { productIndex: number; activeIds: string[] }[]): { warnings, safeNotes, duplicateActives }`가 규칙 테이블만으로 warn/safe 쌍을 산출한다. 매칭 안 된 쌍은 결과에 없다(과잉 경고 금지). 같은 액티브가 ≥2제품이면 duplicateActives에 기록. 시그니처: `judge(input): Pick<CheckResult,'warnings'|'safeNotes'|'duplicateActives'>`.
-  - 참조: 깊이 명세 §규칙 우선순위 / 테스트: T9~T15
-
-- [x] **AM/PM 순서 산출 코어 (결정론적)**
-  - 경로: `src/features/checker/routine.ts`
-  - 완료 조건: `buildRoutine(activeIds: string[]): { amSteps: Step[]; pmSteps: Step[]; needsSunscreen: boolean }`가 광민감→PM, 비타민C/선크림→AM 배치 + viscosityRank 정렬 + 충돌쌍 AM/PM 분리 규칙을 만족한다. 광민감 성분 있고 선크림 미감지면 `needsSunscreen=true`.
-  - 참조: 깊이 명세 §AM/PM 원칙, §엣지 8 / 테스트: T16~T20
-
-- [x] **Gemini 추출/윤문 + 폴백 래퍼**
-  - 경로: `src/lib/gemini.ts`
-  - 완료 조건: `extractWithLlm(ingredients)`와 `narrate(result)`가 키 없거나 8초 타임아웃/에러 시 throw하지 않고 폴백 시그널을 반환한다. 출력은 zod로 재검증되어 사전 id 외 값은 버려진다(환각 차단). 외부 응답은 경계에서 parse.
-  - 참조: 철칙4, 깊이 명세 §아키텍처 / 테스트: T21, T22
-
-- [x] **검사 server action (조립 + 폴백 결정 + 로깅)**
-  - 경로: `src/features/checker/actions.ts`
-  - 완료 조건: `runCheck(input)`가 첫 줄에서 `CheckInput.parse` → 30자 미만 제품 excludedProducts 처리 → Gemini 추출(실패 시 키워드 폴백, `usedLlm` 세팅) → `judge`+`buildRoutine` → (선택)narrate 윤문 → `skinclash_check_log` 익명 1행 insert(실패해도 결과 반환). 전성분 원문은 DB에 저장하지 않는다.
-  - 참조: 깊이 명세 §엣지 1~5,7 / 테스트: T23~T27
-
-- [x] **DB 로깅 + 스키마 등록**
-  - 경로: `src/features/checker/queries.ts`, `supabase-shared/schema.sql`
-  - 완료 조건: `logCheck(payload)`가 `skinclash_check_log`에 익명 행을 insert하고 실패를 삼킨다(결과 흐름을 막지 않음). schema.sql에 prefix 테이블 DDL이 추가된다.
-  - 참조: 데이터 모델 / 테스트: T28
-
-- [x] **입력 화면 UI (제품 카드 + CTA + 예시)**
-  - 경로: `src/app/page.tsx`, `src/features/checker/ui/ProductCardList.tsx`
-  - 완료 조건: 제품 카드 2개 기본, "+ 제품 추가"가 최대 6개에서 비활성+토스트, 각 카드 per-card 인라인 검증(30자 미만 경고), "예시로 채우기"가 프리셋 2제품을 채운다, "충돌 검사하기" 단일 CTA가 제출 중 로딩 표시.
-  - 참조: 화면 §1, 깊이 명세 §엣지 1,9,10 / 테스트: T29(e2e)
-
-- [x] **결과 화면 UI (경고/안심/순서/상태)**
-  - 경로: `src/features/checker/ui/ResultView.tsx`, `WarningCard.tsx`, `SafeCard.tsx`, `RoutineTimeline.tsx`
-  - 완료 조건: 요약 배너(경고N·안심M·제품K, 폴백 배지) + 레드 경고 카드(severity 정렬) + 그린 안심 카드 + AM/PM 타임라인이 렌더된다. 충돌 0건/액티브 미감지/제품 제외/분석 실패(재시도+입력보존) 상태가 각각 다른 화면으로 분기된다. 하단 디스클레이머 고정.
-  - 참조: 화면 §2, 깊이 명세 §엣지 2,3,7,8,11,12 / 테스트: T30, T31(e2e)
-
-- [x] **디자인 아이덴티티 확정 (design 스킬 Phase 0~1)**
-  - 경로: `DESIGN.md`, `src/app/globals.css`
-  - 완료 조건: Toss/Stripe(+Family) 레퍼런스 기반 무드보드 → 토큰. 시맨틱 컬러(경고 레드/안심 그린/팁 옐로우)와 충돌하지 않는 브랜드 컬러 확정, 팩토리 기본 토큰을 교체(Stop 훅 통과). 형용사 3개로 모든 색·radius 설명 가능.
-  - 참조: 디자인 아이덴티티 §
-
-- [x] **제품 README + 디스클레이머 카피**
-  - 경로: `README.md`
-  - 완료 조건: 팩토리 설명이 아닌 이 제품(같이써도돼?) 설명으로 교체, 상단 `mvp-factory:README-TODO` 센티넬 제거. 결과 디스클레이머 문구 확정.
-
-- [x] **테스트 작성 (코어 우선)**
-  - 경로: `src/features/checker/*.test.ts`
-  - 완료 조건: T1~T28 단위 테스트 통과. engine/extract/routine 코어는 LLM 없이 결정론적으로 검증된다. `pnpm check` green.
-
+- [x] env 확장 + 검증 / 성분 사전·규칙 정적 데이터 / zod 스키마 / 키워드 추출 / 충돌 판정 코어 / AM·PM 루틴 코어 / Gemini 추출·윤문 폴백 / 검사 server action / DB 로깅 / 입력·결과 UI / 디자인 아이덴티티 / README / 단위테스트 (T1~T28)
 - [ ] **스모크 e2e**
   - 경로: `e2e/check.spec.ts`
   - 완료 조건: 예시 채우기 → 검사 → 결과에 경고/안심/순서가 보이는 해피패스 1개 + 액티브 미감지 입력 시 중립 카드 1개. `pnpm e2e` green.
@@ -220,7 +167,88 @@
 - T23~T27: runCheck(parse·제품제외·폴백 usedLlm·조립·로그실패 무시)
 - T28: logCheck 익명·실패 삼킴
 - T29~T31: e2e/UI 상태
+- **T40~T52: v3 입력 자동화** (§v3 테스트 매핑 참조)
+
+## v2 고도화 (단일 기능 깊이 강화 — 신규 기능 아님)
+
+리서치(웹) 결론: 경쟁자(화해·HadaBuddy·SkinSort)의 공통 실패는 **반박된 통념까지 빨갛게 경고**하는 것. 우리만 제품명 그대로 **"네, 같이 써도 돼요 — 이유는 이거예요"를 근거(출처)와 함께** 말한다 = 유일한 차별점. 해자는 코드가 아니라 (a) 한글 전성분 별칭 커버리지, (b) 통념/논쟁/정설 confidence 등급 + 출처 인용, (c) 유도체/형태별 미묘한 차이(아다팔렌+BPO 안전 vs 트레티노인+BPO 고위험; 순수 비타민C vs SAP/MAP/THD)를 결정론적으로 인코딩한 것.
+
+**이번 빌드 범위(충돌검사+루틴 단일 기능의 깊이만 확장):**
+
+- **성분 사전 10종 → ~30종**: 레티노이드 6종(유도체 분리)·산 AHA/BHA/PHA·비타민C 순수형/유도체 분리·미백 액티브·진정/장벽 성분. 그룹 토큰(`groups`)으로 묶음.
+- **충돌 규칙 확장 + 신규 필드**: `verdict` 3단계(warn/caution/safe), `confidence`(established/contested/myth), `mechanismType`(자극/산화/불활성화/pH/광민감/시너지/건조), `source`(출처 인용). 반박된 통념은 myth로 그린 안심.
+- **specificity 해소 엔진**: 구체 id 규칙이 그룹 규칙을 이긴다 → 아다팔렌+BPO는 안전인데 레티놀+BPO는 주의, 순수 비타민C+BPO는 경고인데 SAP+BPO는 침묵. 유도체 nuance가 차별화의 핵심.
+- **장벽케어 추천(barrierTip)** + **격일(스킨 사이클링) 안내(alternateDaySuggestions)**: 경쟁자가 안 하는 "그래서 어떻게"의 깊이.
+- **UI**: 3색 신호등(레드/앰버/그린) + 출처 링크 + contested honest hedge + myth 디벙킹 프레이밍.
+
+> 상세 데이터·스키마·엔진 알고리즘·테스트 매핑은 builder 작업 시 `scratchpad/ENHANCEMENT_SPEC.md`를 단일 진실로 따른다. 아키텍처 원칙(규칙=판정 진실, LLM은 추출+윤문, 폴백 100%)은 불변.
+
+## v3 입력 자동화 (입력 마찰 제거 — 신규 기능 아님, 입력 레이어만 추가)
+
+오너 피드백: "입력이 너무 어렵다 — 전성분을 외우지도 않는다." 핵심 기능은 여전히 1개(충돌검사+루틴). **입력 방법만 두 가지 추가**한다. 둘 다 전성분 textarea를 **채우는 입력 레이어**일 뿐, 판정 파이프라인(extract→judge→routine)은 그대로다. **불변 제약: Vision/LLM은 추출 전용, 충돌 판정엔 절대 관여하지 않는다.**
+
+### 1) 사진으로 전성분 (Gemini Vision OCR)
+
+- 각 제품 카드에 "사진으로 추가"(파일 선택 + 드래그&드롭). 사용자가 제품 뒷면(전성분) 사진을 올리면 Gemini Vision이 **전성분 텍스트만** 추출해 카드 textarea에 채운다.
+- 추출 텍스트는 **편집 가능**하게 보여주고 "사진에서 읽었어요 — 맞는지 확인해 주세요" 안내(환각 방어 = 사용자 눈으로 검증). 이후 기존 extract→judge 파이프라인을 그대로 탄다.
+- Vision은 **추출 전용**. 규칙 엔진이 그 텍스트를 결정론적으로 판정. Vision/LLM이 충돌 여부를 정하는 일은 절대 없음.
+- **키워드 폴백 불가**(이미지엔 텍스트 없음). `GEMINI_API_KEY` 미설정/실패/타임아웃(8초) 시 graceful: "사진 인식이 안 돼요. 전성분을 직접 붙여넣어 주세요." 사진 버튼은 키 없으면 숨김/비활성. **붙여넣기 핵심 흐름은 영향 없음.**
+- 외부 입력(이미지)은 경계에서 검증: 타입(jpg/png/webp), 크기 상한 ~6MB, zod로 Vision 응답 형태 재검증.
+
+### 2) 제품 유형 프리셋 칩 (DB 없이 30초 시작)
+
+- 입력 영역 상단에 큐레이션된 한국 제품 아키타입 칩 ~8종.
+- 각 칩 → 대표 전성분 문자열(현실적, 헤드라인 액티브 + 흔한 베이스 성분)로 매핑한 **정적 데이터**(zod 검증). 칩 누르면 그 전성분이 채워진 제품 카드가 추가됨(제품명=아키타입). 편집 가능, 같은 파이프라인.
+- DB·LLM 불필요, 즉시. "대표 성분 기준이라 실제 제품과 다를 수 있어요" 정직한 안내.
+- 최대 6개 제한 준수, 프리셋+붙여넣기+사진 혼용 가능.
+
+### v3 작업 분해 (builder용 — 상세 명세는 `scratchpad/INPUT_SPEC.md`)
+
+- [x] **프리셋 아키타입 정적 데이터**
+  - 경로: `src/features/checker/presets-data.ts`, `src/features/checker/presets.ts`(zod 검증·export)
+  - 완료 조건: 8종 아키타입(`id`/`label`/`ingredients`)이 `PresetSchema`를 만족하며 모듈 로드 시 검증된다. 각 `ingredients`는 30자 이상이고, 헤드라인 액티브가 키워드 추출(`extractByKeyword`)로 최소 1개 이상 잡힌다.
+  - 참조: INPUT_SPEC §2 / 테스트: T40, T41
+- [x] **프리셋 칩 UI**
+  - 경로: `src/features/checker/ui/PresetChips.tsx`, `useProductList.ts`(addPreset 추가), `src/app/page.tsx`
+  - 완료 조건: 히어로 아래 칩 8종 렌더. 칩 클릭 시 제품명=label·전성분=ingredients인 카드가 추가되고(6개 상한 도달 시 비활성+토스트), 정직성 안내 한 줄이 보인다. 첫 클릭은 빈 카드(2개 중 첫 빈 카드)를 채우거나 새 카드 추가.
+  - 참조: INPUT_SPEC §2 UI / 테스트: T42(e2e)
+- [x] **Gemini Vision OCR 함수**
+  - 경로: `src/lib/gemini.ts`(`extractTextFromImage` 추가)
+  - 완료 조건: `extractTextFromImage(base64, mimeType)`가 키 없거나 8초 타임아웃/에러 시 throw하지 않고 `{ ok:false }`를 반환한다. 성공 시 zod로 검증된 `{ ok:true, text }`. 전성분 아닌 사진이면 빈/짧은 text가 그대로 흘러 액티브 미감지로 자연 처리.
+  - 참조: INPUT_SPEC §1 시그니처 / 테스트: T43, T44
+- [x] **사진 OCR server action + 이미지 경계 검증**
+  - 경로: `src/features/checker/ocr-action.ts`(`runOcr`), `src/features/checker/ocr-schema.ts`(zod)
+  - 완료 조건: `runOcr(input)`가 첫 줄에서 `OcrInputSchema.parse`(mimeType jpg/png/webp, base64 크기 ≤6MB) → `extractTextFromImage` → `{ ok:true, text }` 또는 사용자향 한국어 에러를 반환한다. 키 없으면 액션이 호출 전 차단되도록 capability 플래그로 분기. 이미지·결과는 DB·디스크에 저장하지 않는다.
+  - 참조: INPUT_SPEC §1 server action / 테스트: T45~T48
+- [x] **Gemini capability 노출(서버→클라이언트)**
+  - 경로: `src/features/checker/capability.ts`(`getCapability`), `src/app/page.tsx`(server boundary에서 주입)
+  - 완료 조건: 키 유무를 클라이언트에 boolean으로 전달한다. `geminiEnabled=false`면 사진 업로드 UI가 렌더되지 않는다. 붙여넣기·프리셋·검사 흐름은 키 유무와 무관히 동작.
+  - 참조: INPUT_SPEC §env 분기 / 테스트: T49(e2e)
+- [x] **카드별 사진 업로드 UI**
+  - 경로: `src/features/checker/ui/PhotoUpload.tsx`, `ProductCard.tsx`(통합)
+  - 완료 조건: `geminiEnabled`일 때 카드에 "사진으로 추가"(클릭+드래그) 노출. 업로드 → 카드별 로딩 스피너 → 성공 시 textarea에 텍스트 채움 + "사진에서 읽었어요 — 맞는지 확인해 주세요" 배너 + 편집 가능. 타입/크기 위반 시 인라인 에러("jpg/png/webp, 6MB 이하"). 실패/타임아웃 시 "사진 인식이 안 돼요. 직접 붙여넣어 주세요." 카드마다 독립 상태(한 카드 로딩이 다른 카드를 막지 않음).
+  - 참조: INPUT_SPEC §1 UI, 엣지 / 테스트: T50, T51(e2e)
+- [ ] **v3 단위 테스트 + e2e 스모크**
+  - 경로: `src/features/checker/presets.test.ts`, `gemini-ocr.test.ts`(또는 기존 test에 병합), `e2e/input.spec.ts`
+  - 완료 조건: T40~T52 통과. 프리셋 칩→검사 해피패스 e2e 1개, 키 없을 때 사진 버튼 부재 e2e 1개. `pnpm check` + `pnpm e2e` green.
+  - 테스트: T40~T52 (T40~T48 단위 테스트 완료. T42/T49/T50/T51/T52 e2e는 미완 — Backlog)
+
+### v3 테스트 매핑
+
+- T40: 8종 프리셋이 `PresetSchema` 통과 + ingredients ≥30자
+- T41: 각 프리셋 ingredients가 `extractByKeyword`로 헤드라인 액티브 ≥1개 감지
+- T42: (e2e) 프리셋 칩 클릭 → 카드 채워짐 → 검사 → 결과 표시
+- T43: `extractTextFromImage` 키 없을 때 `{ ok:false }` (throw 안 함)
+- T44: 타임아웃/에러 시 `{ ok:false }` (throw 안 함)
+- T45: `OcrInputSchema` 잘못된 mimeType 거부
+- T46: `OcrInputSchema` 6MB 초과 base64 거부
+- T47: `runOcr` 정상 시 `{ ok:true, text }`
+- T48: `runOcr`가 이미지를 저장하지 않음(로그/DB insert 호출 없음)
+- T49: (e2e) 키 없을 때 사진 업로드 버튼 미렌더, 붙여넣기 흐름 정상
+- T50: 카드별 사진 상태 독립(한 카드 로딩이 다른 카드 입력 차단 안 함) — 단위/컴포넌트
+- T51: (e2e) 사진 업로드 mock → textarea 채움 → "맞는지 확인해 주세요" 배너
+- T52: 타입/크기 위반 시 인라인 에러 표시(서버 도달 전 클라이언트 차단)
 
 ## 성공 지표
 
-**이메일 아님 / 결제 아님 — 핵심 행동 완료율**: `skinclash_check_log` 기준 "방문 대비 검사 완료(=결과 1회 산출) 비율". 입력→결과까지 도달하면 도구의 가치가 전달된 것으로 본다. 부가로 `used_llm` 비율과 `warn_count>0` 비율로 "실제 충돌을 가진 사용자가 얼마나 오는지"를 본다.
+**이메일 아님 / 결제 아님 — 핵심 행동 완료율**: `skinclash_check_log` 기준 "방문 대비 검사 완료(=결과 1회 산출) 비율". 입력→결과까지 도달하면 도구의 가치가 전달된 것으로 본다. 부가로 `used_llm` 비율과 `warn_count>0` 비율로 "실제 충돌을 가진 사용자가 얼마나 오는지"를 본다. **v3는 입력 마찰을 줄여 이 완료율을 끌어올리는 것이 목표** — 프리셋/사진이 검사 완료율을 높이는지 확인한다.

@@ -1,6 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/app/**/{page,layout,loading,error,not-found,route}.tsx", "src/app/**/route.ts"],
-  "project": ["src/**/*.{ts,tsx}"],
-  "ignoreDependencies": ["@tailwindcss/postcss", "tailwindcss"]
+  "entry": [
+    "src/app/**/{page,layout,loading,error,not-found,route}.tsx",
+    "src/app/**/route.ts",
+    "scripts/*.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/*.ts"],
+  "ignoreDependencies": ["@tailwindcss/postcss", "tailwindcss"],
+  "ignoreBinaries": ["tsx"],
+  "ignoreIssues": {
+    "src/lib/env.ts": ["exports"]
+  }
 }

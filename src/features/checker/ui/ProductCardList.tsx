@@ -3,10 +3,12 @@
 import type { CheckResult } from "@/features/checker/schema";
 import { ProductCard } from "./ProductCard";
 import { ProductListActions } from "./ProductListActions";
+import { PresetChips } from "./PresetChips";
 import { useProductList, MAX_PRODUCTS } from "./useProductList";
 
 type Props = {
   onResult: (result: CheckResult, productNames: (string | undefined)[]) => void;
+  geminiEnabled: boolean;
 };
 
 function Toast({ message, visible }: { message: string; visible: boolean }) {
@@ -33,7 +35,7 @@ function Toast({ message, visible }: { message: string; visible: boolean }) {
   );
 }
 
-export function ProductCardList({ onResult }: Props) {
+export function ProductCardList({ onResult, geminiEnabled }: Props) {
   const {
     products,
     isSubmitting,
@@ -45,6 +47,7 @@ export function ProductCardList({ onResult }: Props) {
     removeProduct,
     fillPreset,
     submitCheck,
+    addPreset,
   } = useProductList(onResult);
 
   return (
@@ -53,6 +56,7 @@ export function ProductCardList({ onResult }: Props) {
         message="한 번에 최대 6개까지 검사할 수 있어요"
         visible={toastVisible}
       />
+      <PresetChips atMax={products.length >= MAX_PRODUCTS} onPick={addPreset} />
       <div className="space-y-3">
         {products.map((product, index) => (
           <ProductCard
@@ -60,6 +64,7 @@ export function ProductCardList({ onResult }: Props) {
             product={product}
             index={index}
             canRemove={products.length > 2}
+            geminiEnabled={geminiEnabled}
             onNameChange={(v) => updateField(index, "name", v)}
             onIngredientsChange={(v) => updateField(index, "ingredients", v)}
             onRemove={() => removeProduct(index)}

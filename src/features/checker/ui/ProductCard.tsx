@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { PhotoUpload } from "./PhotoUpload";
 
 export type ProductEntry = {
   name: string;
@@ -11,12 +12,13 @@ type Props = {
   product: ProductEntry;
   index: number;
   canRemove: boolean;
+  geminiEnabled: boolean;
   onNameChange: (value: string) => void;
   onIngredientsChange: (value: string) => void;
   onRemove: () => void;
 };
 
-const MIN_LEN = 30;
+const MIN_LEN = 3;
 const MAX_LEN = 4000;
 const WARN_LEN = 3800;
 
@@ -25,7 +27,7 @@ function IngredientHint({ value }: { value: string }) {
   if (len > 0 && len < MIN_LEN) {
     return (
       <p className="mt-1 text-xs" style={{ color: "var(--color-warn-high)" }}>
-        전성분을 더 붙여넣어 주세요 (30자 이상)
+        전성분을 더 붙여넣어 주세요 (3자 이상)
       </p>
     );
   }
@@ -82,6 +84,7 @@ export function ProductCard({
   product,
   index,
   canRemove,
+  geminiEnabled,
   onNameChange,
   onIngredientsChange,
   onRemove,
@@ -120,13 +123,18 @@ export function ProductCard({
       </div>
 
       <div>
-        <label
-          htmlFor={`product-ingredients-${index}`}
-          className="mb-1 block text-xs font-medium"
-          style={{ color: "var(--color-ink-sub)" }}
-        >
-          전성분
-        </label>
+        <div className="mb-1 flex items-center justify-between">
+          <label
+            htmlFor={`product-ingredients-${index}`}
+            className="block text-xs font-medium"
+            style={{ color: "var(--color-ink-sub)" }}
+          >
+            전성분
+          </label>
+          {geminiEnabled && (
+            <PhotoUpload index={index} onText={onIngredientsChange} />
+          )}
+        </div>
         <textarea
           id={`product-ingredients-${index}`}
           rows={5}

@@ -4,17 +4,17 @@ import { extractByKeyword } from "./extract";
 describe("extractByKeyword", () => {
   it("한글 별칭으로 BHA를 추출한다", () => {
     const result = extractByKeyword("살리실릭애씨드 2%, 정제수");
-    expect(result).toContain("bha-salicylic");
+    expect(result).toContain("salicylic-acid");
   });
 
   it("영문으로 살리실산을 추출한다", () => {
     const result = extractByKeyword("salicylic acid 2%, water");
-    expect(result).toContain("bha-salicylic");
+    expect(result).toContain("salicylic-acid");
   });
 
   it("대소문자 무시", () => {
     const result = extractByKeyword("Salicylic Acid 2%, Aqua");
-    expect(result).toContain("bha-salicylic");
+    expect(result).toContain("salicylic-acid");
   });
 
   it("여러 성분 동시 추출", () => {
@@ -33,8 +33,8 @@ describe("extractByKeyword", () => {
     expect(result.filter((id) => id === "retinol")).toHaveLength(1);
   });
 
-  it("비타민C 한글 별칭", () => {
+  it("비타민C 한글 별칭 → l-ascorbic-acid", () => {
     const result = extractByKeyword("아스코빅애씨드 15%, 정제수");
-    expect(result).toContain("vitamin-c");
+    expect(result).toContain("l-ascorbic-acid");
   });
 });

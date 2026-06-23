@@ -52,6 +52,13 @@
 - 이유: 시맨틱 컬러(경고=레드, 안심=그린, 팁=옐로우)가 정보 축이므로 브랜드가 이 셋과 충돌하면 안 됨. 블루 계열이 의료/신뢰 도메인에 적합하면서 Toss 파랑과도 구별됨
 - 트레이드오프: 없음 — DESIGN.md §Phase 1에 근거 기록
 
+### [D6] Gemini Vision 모델 — gemini-2.5-flash (VISION_MODEL 상수 분리)
+
+- 선택: OCR 전용으로 `VISION_MODEL = "gemini-2.5-flash"` 상수 분리, 기존 텍스트 모델(`MODEL = "gemini-3.1-flash-lite"`)과 병행
+- 이유: `gemini-3.1-flash-lite`는 텍스트 전용 모델 — 이미지 인라인 데이터(`inlineData`) 파트를 지원하지 않음. `gemini-2.5-flash`는 멀티모달 GA 모델로 Vision 입력 공식 지원
+- 대안: `gemini-2.0-flash`(이전 멀티모달), `gemini-1.5-pro`
+- 트레이드오프: 모델 두 개 관리. 단 OCR은 키가 있을 때만 호출되고 텍스트 추출/윤문 경로와 격리되어 상호 영향 없음
+
 ## Stuck & Solved
 
 ## Backlog

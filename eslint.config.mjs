@@ -62,7 +62,7 @@ const eslintConfig = defineConfig([
     },
   },
   // eslint-config-next 기본 ignore 재정의
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", ".claude/worktrees/**"]),
 ]);
 
 export default eslintConfig;

@@ -4,11 +4,12 @@ import { useState, useCallback } from "react";
 import { runCheck } from "@/features/checker/actions";
 import type { CheckResult } from "@/features/checker/schema";
 import type { ProductEntry } from "./ProductCard";
+import type { Preset } from "@/features/checker/presets";
 
 export const MAX_PRODUCTS = 6;
-export const MIN_INGREDIENT_LEN = 30;
+const MIN_INGREDIENT_LEN = 3;
 
-export const PRESET: ProductEntry[] = [
+const PRESET: ProductEntry[] = [
   {
     name: "레티놀 세럼",
     ingredients:
@@ -30,7 +31,7 @@ type SubmitDeps = {
   onResult: OnResult;
 };
 
-export async function runSubmitCheck({
+async function runSubmitCheck({
   products,
   setIsSubmitting,
   setSubmitError,
@@ -69,31 +70,41 @@ function useToast() {
   return { toastVisible, showToast };
 }
 
-export function useProductList(onResult: OnResult) {
-  const [products, setProducts] = useState<ProductEntry[]>([
-    { name: "", ingredients: "" },
-    { name: "", ingredients: "" },
-  ]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const { toastVisible, showToast } = useToast();
+export function applyPreset(
+  prev: ProductEntry[],
+  preset: Preset,
+): ProductEntry[] {
+  const emptyIndex = prev.findIndex(
+    (p) => p.name.trim() === "" && p.ingredients.trim() === "",
+  );
+  if (emptyIndex !== -1) {
+    return prev.map((p, i) =>
+      i === emptyIndex
+        ? { name: preset.label, ingredients: preset.ingredients }
+        : p,
+    );
+  }
+  return [...prev, { name: preset.label, ingredients: preset.ingredients }];
+}
 
-  const canSubmit =
-    !isSubmitting &&
-    products.some((p) => p.ingredients.trim().length >= MIN_INGREDIENT_LEN);
+type ActionDeps = {
+  setSubmitError: (v: string | null) => void;
+  showToast: () => void;
+};
 
+function useProductActions(
+  products: ProductEntry[],
+  setProducts: React.Dispatch<React.SetStateAction<ProductEntry[]>>,
+  { setSubmitError, showToast }: ActionDeps,
+) {
+  const atMax = products.length >= MAX_PRODUCTS;
   return {
-    products,
-    isSubmitting,
-    submitError,
-    toastVisible,
-    canSubmit,
     updateField: (index: number, field: keyof ProductEntry, value: string) =>
       setProducts((prev) =>
         prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
       ),
     addProduct: () => {
-      if (products.length >= MAX_PRODUCTS) {
+      if (atMax) {
         showToast();
         return;
       }
@@ -105,6 +116,46 @@ export function useProductList(onResult: OnResult) {
       setProducts(PRESET.map((p) => ({ ...p })));
       setSubmitError(null);
     },
+    addPreset: (preset: Preset) => {
+      setProducts((prev) => {
+        const hasEmptySlot = prev.some(
+          (p) => p.name.trim() === "" && p.ingredients.trim() === "",
+        );
+        if (prev.length >= MAX_PRODUCTS && !hasEmptySlot) {
+          showToast();
+          return prev;
+        }
+        return applyPreset(prev, preset);
+      });
+      setSubmitError(null);
+    },
+  };
+}
+
+export function useProductList(onResult: OnResult) {
+  const [products, setProducts] = useState<ProductEntry[]>([
+    { name: "", ingredients: "" },
+    { name: "", ingredients: "" },
+  ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { toastVisible, showToast } = useToast();
+  const actions = useProductActions(products, setProducts, {
+    setSubmitError,
+    showToast,
+  });
+
+  const canSubmit =
+    !isSubmitting &&
+    products.some((p) => p.ingredients.trim().length >= MIN_INGREDIENT_LEN);
+
+  return {
+    products,
+    isSubmitting,
+    submitError,
+    toastVisible,
+    canSubmit,
+    ...actions,
     submitCheck: () =>
       runSubmitCheck({ products, setIsSubmitting, setSubmitError, onResult }),
   };

@@ -2,12 +2,12 @@
 
 import { ZodError } from "zod";
 import { CheckInputSchema } from "./schema";
-import type { CheckResult } from "./schema";
+import type { CheckResult, WarningItem, SafeNoteItem } from "./schema";
 import { extractByKeyword } from "./extract";
 import { extractWithLlm, narrate } from "@/lib/gemini";
 import { judge } from "./engine";
 import { buildRoutine } from "./routine";
-import { logCheck } from "./queries";
+import { logCheck, logNoRulePairs } from "./queries";
 
 type IncludedProduct = {
   originalIndex: number;
@@ -27,7 +27,7 @@ function partitionProducts(products: ParsedProduct[]): {
   for (let i = 0; i < products.length; i++) {
     const product = products[i];
     if (!product) continue;
-    if (product.ingredients.trim().length < 30) {
+    if (product.ingredients.trim().length < 3) {
       excludedIndices.push(i);
     } else {
       included.push({
@@ -44,6 +44,7 @@ function partitionProducts(products: ParsedProduct[]): {
 function emptyResult(excludedProducts: number[]): CheckResult {
   return {
     warnings: [],
+    cautions: [],
     safeNotes: [],
     amSteps: [],
     pmSteps: [],
@@ -52,15 +53,15 @@ function emptyResult(excludedProducts: number[]): CheckResult {
     needsSunscreen: false,
     usedLlm: false,
     detectedActiveIds: [],
+    barrierTip: { recommend: false, missingSupport: false },
+    alternateDaySuggestions: [],
+    noRulePairs: [],
   };
 }
 
 async function extractActives(included: IncludedProduct[]) {
   const llmResult = await extractWithLlm(included.map((p) => p.ingredients));
 
-  // Union per-product keyword results with LLM per-product results.
-  // Keyword matching gives deterministic per-product attribution;
-  // LLM catches aliases and brand names that keyword regex misses.
   return {
     productActives: included.map((p, i) => ({
       productIndex: p.originalIndex,
@@ -76,43 +77,63 @@ async function extractActives(included: IncludedProduct[]) {
 }
 
 async function applyNarration(
-  warnings: ReturnType<typeof judge>["warnings"],
-  safeNotes: ReturnType<typeof judge>["safeNotes"],
+  warnings: WarningItem[],
+  cautions: WarningItem[],
+  safeNotes: SafeNoteItem[],
 ) {
-  // Narrate top warnings with LLM if available; falls back to rule-table copy on failure
-  const narrationMap = await narrate(warnings, safeNotes);
-  const narratedWarnings = warnings.map((w) => {
-    const narration = narrationMap.get(w.ruleId);
-    if (!narration) return w;
-    return {
-      ...w,
-      mechanism: narration.narratedMechanism,
-      action: narration.narratedAction,
-    };
-  });
-  return { narratedWarnings, narrationUsed: narrationMap.size > 0 };
+  const allConflicts = [...warnings, ...cautions];
+  const narrationMap = await narrate(allConflicts, safeNotes);
+
+  function applyNarrationToItems(items: WarningItem[]): WarningItem[] {
+    return items.map((w) => {
+      const narration = narrationMap.get(w.ruleId);
+      if (!narration) return w;
+      return {
+        ...w,
+        mechanism: narration.narratedMechanism,
+        action: narration.narratedAction,
+      };
+    });
+  }
+
+  return {
+    narratedWarnings: applyNarrationToItems(warnings),
+    narratedCautions: applyNarrationToItems(cautions),
+    narrationUsed: narrationMap.size > 0,
+  };
 }
 
 async function analyzeProducts(
   included: IncludedProduct[],
 ): Promise<Omit<CheckResult, "excludedProducts">> {
   const { productActives, llmUsed } = await extractActives(included);
-  const { warnings, safeNotes, duplicateActives } = judge(productActives);
-  const { narratedWarnings, narrationUsed } = await applyNarration(
+  const {
     warnings,
+    cautions,
     safeNotes,
-  );
+    duplicateActives,
+    barrierTip,
+    alternateDaySuggestions,
+    noRulePairs,
+  } = judge(productActives);
+
+  // Fire-and-forget flywheel logging — swallow all failures
+  logNoRulePairs(noRulePairs).catch(() => undefined);
+  const { narratedWarnings, narratedCautions, narrationUsed } =
+    await applyNarration(warnings, cautions, safeNotes);
 
   const allActiveIds = Array.from(
     new Set(productActives.flatMap((p) => p.activeIds)),
   );
+  const allNarratedConflicts = [...narratedWarnings, ...narratedCautions];
   const { amSteps, pmSteps, needsSunscreen } = buildRoutine(
     allActiveIds,
-    narratedWarnings,
+    allNarratedConflicts,
   );
 
   return {
     warnings: narratedWarnings,
+    cautions: narratedCautions,
     safeNotes,
     amSteps,
     pmSteps,
@@ -120,6 +141,9 @@ async function analyzeProducts(
     needsSunscreen,
     usedLlm: llmUsed || narrationUsed,
     detectedActiveIds: allActiveIds,
+    barrierTip,
+    alternateDaySuggestions,
+    noRulePairs,
   };
 }
 
@@ -147,12 +171,11 @@ export async function runCheck(
   const partial = await analyzeProducts(included);
   const result: CheckResult = { ...partial, excludedProducts: excludedIndices };
 
-  // Logging is best-effort — never block result delivery on failure
   try {
     await logCheck({
       productCount: included.length,
       detectedActiveIds: result.detectedActiveIds,
-      warnCount: result.warnings.length,
+      warnCount: result.warnings.length + result.cautions.length,
       safeCount: result.safeNotes.length,
       usedLlm: result.usedLlm,
     });

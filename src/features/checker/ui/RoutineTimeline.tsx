@@ -42,7 +42,7 @@ function TimeSlot({
       ) : (
         <ol aria-labelledby={slotId} className="space-y-2">
           {steps.map((step, i) => (
-            <li key={step.activeId} className="flex items-center gap-3">
+            <li key={step.activeId} className="flex min-h-8 items-center gap-3">
               <span
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                 style={{

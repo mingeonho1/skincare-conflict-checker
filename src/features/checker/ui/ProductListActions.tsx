@@ -75,9 +75,8 @@ export function ProductListActions({
         disabled={!canSubmit}
         className="flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] py-3.5 text-base font-semibold text-white transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         style={{
-          background: canSubmit
-            ? "var(--color-primary)"
-            : "var(--color-ink-weak)",
+          background: "var(--color-primary)",
+          opacity: canSubmit ? 1 : 0.5,
         }}
       >
         {isSubmitting ? (

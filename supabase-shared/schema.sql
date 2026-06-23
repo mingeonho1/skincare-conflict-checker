@@ -196,3 +196,12 @@ create table if not exists public.skinclash_check_log (
 );
 -- 서버(secret key)만 접근 — RLS 활성화 후 anon 정책 없음으로 클라이언트 직접 접근 차단
 alter table public.skinclash_check_log enable row level security;
+
+create table if not exists public.skinclash_check_log_pairs (
+  id         uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  active_a   text not null,
+  active_b   text not null
+);
+-- 서버(secret key)만 접근 — RLS 활성화 후 anon 정책 없음으로 클라이언트 직접 접근 차단
+alter table public.skinclash_check_log_pairs enable row level security;

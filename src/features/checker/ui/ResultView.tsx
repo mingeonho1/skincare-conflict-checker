@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import type { CheckResult } from "@/features/checker/schema";
+import { countCurationStats } from "@/features/checker/data";
 import { ResultBanners } from "./ResultBanners";
 import { ResultSections } from "./ResultSections";
 
@@ -9,14 +10,22 @@ type Props = {
   onReset: () => void;
 };
 
+const { activeCount, ruleCount } = countCurationStats();
+
 export function ResultView({ result, productNames, onReset }: Props) {
   const analyzedCount = productNames.length - result.excludedProducts.length;
   const allExcluded = analyzedCount <= 0;
   const noActives = !allExcluded && result.detectedActiveIds.length === 0;
-  const hasConflicts = result.warnings.length > 0;
+  const hasConflicts = result.warnings.length > 0 || result.cautions.length > 0;
   const hasSafeNotes = result.safeNotes.length > 0;
   const zeroFindings =
     !allExcluded && !noActives && !hasConflicts && !hasSafeNotes;
+  // Only show the "silence ≠ safe" note when actives were detected — avoids
+  // duplicating the already-present noActives message.
+  const hasNoRulePairs =
+    !noActives &&
+    result.detectedActiveIds.length > 0 &&
+    result.noRulePairs.length > 0;
 
   return (
     <div className="space-y-6">
@@ -26,6 +35,7 @@ export function ResultView({ result, productNames, onReset }: Props) {
         allExcluded={allExcluded}
         noActives={noActives}
         zeroFindings={zeroFindings}
+        hasNoRulePairs={hasNoRulePairs}
       />
       <ResultSections result={result} />
       <div className="pb-24">
@@ -48,6 +58,29 @@ export function ResultView({ result, productNames, onReset }: Props) {
         }}
       >
         일반 정보이며 의료 조언이 아니에요. 피부과 전문의 상담을 권장해요.
+        <span
+          className="mx-2 hidden sm:inline"
+          aria-hidden="true"
+          style={{ color: "var(--color-border)" }}
+        >
+          ·
+        </span>
+        <span className="block sm:inline" style={{ marginTop: "2px" }}>
+          현재 액티브 성분 {activeCount}종 · 충돌 규칙 {ruleCount}개를 검증해
+          판정해요.
+        </span>
+        {!result.usedLlm && (
+          <span
+            className="ml-2 inline-block rounded-[var(--radius-badge)] px-2 py-0.5 text-xs font-medium"
+            style={{
+              background: "var(--color-surface)",
+              color: "var(--color-ink-weak)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            기본 분석 모드
+          </span>
+        )}
       </div>
     </div>
   );

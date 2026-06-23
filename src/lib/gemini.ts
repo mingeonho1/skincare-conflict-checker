@@ -8,12 +8,16 @@ import type { WarningItem, SafeNoteItem } from "@/features/checker/schema";
 // 담당하고, 이 모델은 (a)전성분에서 액티브 추출 (b)경고 카피 윤문에만 쓴다.
 const MODEL = "gemini-3.1-flash-lite";
 
-export type LlmExtractionResult = {
+// Vision OCR 전용 모델 — Flash-Lite는 텍스트 전용(멀티모달 미지원)이므로
+// 이미지 inlineData 파트를 받을 수 있는 gemini-2.5-flash를 분리 사용한다.
+const VISION_MODEL = "gemini-2.5-flash";
+
+type LlmExtractionResult = {
   perProduct: string[][];
   usedLlm: boolean;
 };
 
-export type LlmNarrationResult = {
+type LlmNarrationResult = {
   narratedMechanism: string;
   narratedAction: string;
 } | null;
@@ -31,6 +35,54 @@ const NarrationSchema = z.array(
 function extractJsonArray(text: string): string | null {
   const match = text.match(/\[[\s\S]*\]/);
   return match ? (match[0] ?? null) : null;
+}
+
+function extractJsonObject(text: string): string | null {
+  const match = text.match(/\{[\s\S]*\}/);
+  return match ? (match[0] ?? null) : null;
+}
+
+const OCR_PROMPT = `이 이미지는 화장품 뒷면의 전성분(ingredients) 표기입니다.
+전성분 목록 텍스트만 그대로 추출해 한 줄로 반환하세요(쉼표 구분).
+- 성분명만. 함량·주의문구·제조사·바코드 등은 제외.
+- 전성분 표기가 안 보이면 빈 문자열을 반환.
+- 추측해서 성분을 지어내지 마세요(보이는 글자만).
+JSON으로만 응답: {"text": "..."}`;
+
+type OcrResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: "no-key" | "failed" };
+
+export async function extractTextFromImage(
+  base64Data: string,
+  mimeType: string,
+): Promise<OcrResult> {
+  if (!env.GEMINI_API_KEY) return { ok: false, reason: "no-key" };
+
+  try {
+    const response = await withTimeout(
+      getClient().models.generateContent({
+        model: VISION_MODEL,
+        contents: [
+          {
+            parts: [
+              { inlineData: { data: base64Data, mimeType } },
+              { text: OCR_PROMPT },
+            ],
+          },
+        ],
+      }),
+      8000,
+    );
+
+    const jsonRaw = extractJsonObject(response.text ?? "");
+    if (!jsonRaw) return { ok: false, reason: "failed" };
+
+    const parsed = z.object({ text: z.string() }).parse(JSON.parse(jsonRaw));
+    return { ok: true, text: parsed.text.slice(0, 4000) };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
 }
 
 function getClient() {
